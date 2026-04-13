@@ -8,50 +8,44 @@ use Illuminate\Http\Request;
 
 class PesananController extends Controller
 {
-    // Fungsi yang menyebabkan error tadi
+    // Menampilkan daftar semua pesanan di halaman Dashboard Admin
     public function dashboardAdmin()
     {
-        // Ambil semua pesanan dan urutkan dari yang terbaru
         $semua_pesanan = Pesanan::with('makanan')->latest()->get();
-
         return view('dashboard', compact('semua_pesanan'));
     }
 
-    // Fungsi untuk menyimpan pesanan dari User
+    // Fungsi untuk menyimpan pesanan baru dari halaman depan
     public function simpanPesanan(Request $request)
-{
-    // 1. Validasi input agar tidak kosong dan nomor HP sesuai
-    $request->validate([
-        'makanan_id' => 'required',
-        'nama_pemesan' => 'required|min:3',
-        'nomor_telepon' => 'required|numeric|digits_between:10,13', // Ini kuncinya!
-    ], [
-        'nomor_telepon.required' => 'Nomor WhatsApp wajib diisi.',
-        'nomor_telepon.digits_between' => 'Nomor WhatsApp minimal 10 digit dan maksimal 13 digit.',
-    ]);
+    {
+        $request->validate([
+            'makanan_id' => 'required',
+            'nama_pemesan' => 'required|min:3',
+            'nomor_telepon' => 'required|numeric|digits_between:10,13',
+        ], [
+            'nomor_telepon.required' => 'Nomor WhatsApp wajib diisi.',
+            'nomor_telepon.digits_between' => 'Nomor WhatsApp minimal 10 digit dan maksimal 13 digit.',
+        ]);
 
-    // 2. Cek apakah stok makanan masih ada
-    $makanan = \App\Models\Makanan::find($request->makanan_id);
-    if ($makanan->stok <= 0) {
-        return back()->with('error', 'Maaf, stok ' . $makanan->nama . ' sudah habis!');
+        $makanan = Makanan::find($request->makanan_id);
+
+        if ($makanan->stok <= 0) {
+            return back()->with('error', 'Maaf, stok ' . $makanan->nama . ' sudah habis!');
+        }
+
+        Pesanan::create([
+            'makanan_id' => $request->makanan_id,
+            'nama_pemesan' => $request->nama_pemesan,
+            'nomor_telepon' => $request->nomor_telepon,
+            'status' => 'menunggu',
+        ]);
+
+        $makanan->decrement('stok');
+
+        return redirect('/')->with('success', 'Pesanan berhasil dikirim! Silakan cek status nanti.');
     }
 
-    // 3. Simpan data ke tabel pesanans
-    \App\Models\Pesanan::create([
-        'makanan_id' => $request->makanan_id,
-        'nama_pemesan' => $request->nama_pemesan,
-        'nomor_telepon' => $request->nomor_telepon,
-        'status' => 'menunggu', // Status awal otomatis 'menunggu'
-    ]);
-
-    // 4. (Opsional) Kurangi stok makanan setelah dipesan
-    $makanan->decrement('stok');
-
-    // 5. Kembalikan ke halaman depan dengan pesan sukses
-    return redirect('/')->with('success', 'Pesanan berhasil dikirim! Silakan cek status nanti.');
-}
-
-    // Fungsi untuk cek status via nomor HP
+    // Fungsi untuk cek status pesanan menggunakan nomor HP
     public function cekStatus(Request $request)
     {
         $pesanan = Pesanan::where('nomor_telepon', $request->nomor)
@@ -59,9 +53,38 @@ class PesananController extends Controller
                           ->latest()
                           ->first();
 
-        // Ambil data makanan agar halaman welcome tidak error variabel $makanans
         $makanans = Makanan::all();
 
         return view('welcome', compact('pesanan', 'makanans'));
+    }
+
+    /* |--------------------------------------------------------------------------
+    | FUNGSI TAMBAHAN UNTUK ADMIN (Dropdown & Hapus)
+    |--------------------------------------------------------------------------
+    */
+
+    // Mengubah status pesanan melalui dropdown di dashboard
+    public function updateStatus(Request $request, $id)
+    {
+        $pesanan = Pesanan::findOrFail($id);
+
+        $request->validate([
+            'status' => 'required|in:menunggu,ditolak,stok_habis'
+        ]);
+
+        $pesanan->update([
+            'status' => $request->status
+        ]);
+
+        return back()->with('success', 'Status pesanan ' . $pesanan->nama_pemesan . ' berhasil diperbarui!');
+    }
+
+    // Menghapus data pesanan secara permanen
+    public function destroy($id)
+    {
+        $pesanan = Pesanan::findOrFail($id);
+        $pesanan->delete();
+
+        return back()->with('success', 'Data pesanan berhasil dihapus.');
     }
 }

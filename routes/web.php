@@ -36,6 +36,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/admin/pesanan/{id}/proses', [PesananController::class, 'prosesPesanan'])->name('admin.pesanan.proses');
     Route::patch('/admin/pesanan/{id}/habis', [PesananController::class, 'stokHabis'])->name('admin.pesanan.habis');
 
+    Route::patch('/admin/pesanan/{id}/update-status', [PesananController::class, 'updateStatus'])->name('admin.pesanan.update-status');
+    Route::delete('/admin/pesanan/{id}', [PesananController::class, 'destroy'])->name('admin.pesanan.destroy');
+
+
     // Route CRUD Makanan (Tambah, Edit, Hapus Menu)
     Route::resource('makanan', MakananController::class);
 
